@@ -4,11 +4,11 @@
 
 ## 👥 Team
 
-| Name | Role |
-|------|------|
-| **Ata Ur Rehman** | Senior Data Engineer |
-| **Sharoz Farhan Afridi** | Senior Data Engineer |
-| **Sneha Sahu** | Senior Data Engineer |
+| Name
+
+| **Ata Ur Rehman** 
+| **Sharoz Farhan Afridi** 
+| **Sneha Sahu**
 
 > **Company:** Sigma TechZone · Logistics Division  
 > **Repository:** [ataur-tsv-sigmoid/sigma-matrix-pipeline](https://github.com/ataur-tsv-sigmoid/sigma-matrix-pipeline)
