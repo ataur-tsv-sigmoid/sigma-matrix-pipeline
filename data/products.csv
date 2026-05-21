@@ -1,0 +1,52 @@
+product_id,name,category,price,stock_quantity,is_active
+PROD001,Samsung Galaxy S25,Smartphones,23361.57,164,True
+PROD002,iPhone 16 Pro,Laptops,19830.12,257,True
+PROD003,OnePlus 13,Tablets,19667.16,193,True
+PROD004,Pixel 9 Pro,Audio,49592.27,161,True
+PROD005,Vivo X200,Cameras,41630.17,212,True
+PROD006,Realme 14 Pro,Wearables,28701.79,361,True
+PROD007,Redmi Note 14 Pro,Gaming,48657.83,476,True
+PROD008,iQOO 13,Accessories,25314.3,472,True
+PROD009,Motorola Edge 50,Smart Home,38972.3,127,True
+PROD010,Oppo Reno 13,Television,18245.46,335,True
+PROD011,Dell XPS 15,Smartphones,13267.43,396,True
+PROD012,MacBook Air M4,Laptops,33266.6,439,True
+PROD013,HP Spectre x360,Tablets,5755.27,331,True
+PROD014,Lenovo ThinkPad X1,Audio,16121.57,235,True
+PROD015,Asus ZenBook 14,Cameras,18859.32,77,True
+PROD016,Acer Swift 5,Wearables,15444.95,392,True
+PROD017,Microsoft Surface Pro 11,Gaming,10828.11,412,True
+PROD018,MSI Prestige 16,Accessories,48554.39,281,True
+PROD019,Razer Blade 15,Smart Home,14339.49,94,True
+PROD020,LG Gram 17,Television,41368.39,256,False
+PROD021,iPad Pro M4,Smartphones,15446.47,455,True
+PROD022,Samsung Galaxy Tab S10,Laptops,6636.67,48,True
+PROD023,OnePlus Pad 2,Tablets,48310.15,450,True
+PROD024,Lenovo Tab P12 Pro,Audio,34011.86,213,False
+PROD025,Realme Pad X,Cameras,40384.37,197,True
+PROD026,Sony WH-1000XM6,Wearables,20313.82,145,True
+PROD027,Bose QC Ultra,Gaming,23261.23,354,True
+PROD028,Apple AirPods Pro 3,Accessories,13832.06,205,True
+PROD029,boAt Airdopes 800,Smart Home,47027.23,65,True
+PROD030,Nothing Ear 3,Television,24078.26,327,True
+PROD031,Sony Alpha ZV-E10 II,Smartphones,28480.45,478,True
+PROD032,Canon EOS R50,Laptops,32702.23,335,True
+PROD033,GoPro Hero 13,Tablets,45514.43,164,True
+PROD034,DJI Osmo Pocket 3,Audio,6710.4,33,False
+PROD035,Fujifilm X-T50,Cameras,15897.95,262,True
+PROD036,Apple Watch Ultra 3,Wearables,12492.7,285,True
+PROD037,Samsung Galaxy Watch 7,Gaming,23205.32,353,False
+PROD038,Garmin Fenix 8,Accessories,35092.59,286,True
+PROD039,Noise ColorFit Ultra,Smart Home,37333.81,89,True
+PROD040,Fitbit Charge 7,Television,33058.08,436,True
+PROD041,PlayStation 5 Slim,Smartphones,20976.68,497,True
+PROD042,Xbox Series X,Laptops,34788.93,121,True
+PROD043,Nintendo Switch 2,Tablets,47529.63,447,True
+PROD044,Razer DeathAdder V3,Audio,49016.39,198,True
+PROD045,Logitech G Pro X,Cameras,48865.37,193,True
+PROD046,Amazon Echo Show 15,Wearables,14503.67,72,False
+PROD047,Google Nest Hub Max,Gaming,41343.98,56,True
+PROD048,Ring Video Doorbell Pro,Accessories,32411.08,315,False
+PROD049,Philips Hue Kit,Smart Home,3474.87,180,True
+PROD050,"Samsung QLED 65""",Television,7163.1,299,True
+PROD051,"LG OLED C4 55""",Smartphones,41619.41,293,True
