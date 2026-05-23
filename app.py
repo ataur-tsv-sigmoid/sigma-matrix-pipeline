@@ -235,6 +235,142 @@ st.markdown(
     ::-webkit-scrollbar-track { background: #0d1117; }
     ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #2DC653; }
+
+    /* ══ Feature 3 — Data Quality CSS ══════════════════════════════════ */
+
+    /* ── DQ Score ring container ── */
+    .dq-score-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 0 16px;
+    }
+    .dq-score-ring {
+        position: relative;
+        width: 160px;
+        height: 160px;
+    }
+    .dq-score-ring svg {
+        transform: rotate(-90deg);
+    }
+    .dq-score-ring .ring-bg {
+        fill: none;
+        stroke: #21262d;
+        stroke-width: 14;
+    }
+    .dq-score-ring .ring-fg {
+        fill: none;
+        stroke-width: 14;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 1s ease, stroke 0.4s ease;
+    }
+    .dq-score-value {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 2rem;
+        font-weight: 800;
+        color: #e6edf3;
+        text-align: center;
+        line-height: 1;
+    }
+    .dq-score-label {
+        font-size: 0.72rem;
+        color: #8b949e;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 4px;
+        text-align: center;
+    }
+    .dq-score-title {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-top: 10px;
+        text-align: center;
+    }
+
+    /* ── DQ Dimension cards ── */
+    .dq-dim-card {
+        background: #161b22;
+        border: 1px solid #21262d;
+        border-radius: 12px;
+        padding: 18px 20px;
+        text-align: center;
+        transition: border-color 0.2s, transform 0.2s;
+        height: 100%;
+    }
+    .dq-dim-card:hover {
+        border-color: #2DC653;
+        transform: translateY(-2px);
+    }
+    .dq-dim-icon {
+        font-size: 1.8rem;
+        margin-bottom: 6px;
+    }
+    .dq-dim-name {
+        font-size: 0.78rem;
+        color: #8b949e;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 4px;
+    }
+    .dq-dim-value {
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+    .dq-dim-desc {
+        font-size: 0.78rem;
+        color: #8b949e;
+    }
+
+    /* ── DQ status badge ── */
+    .dq-badge {
+        display: inline-block;
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    .dq-badge-healthy  { background: rgba(45,198,83,0.15);  color: #2DC653; border: 1px solid #2DC653; }
+    .dq-badge-warning  { background: rgba(255,196,0,0.15);  color: #ffc400; border: 1px solid #ffc400; }
+    .dq-badge-critical { background: rgba(248,81,73,0.15);  color: #f85149; border: 1px solid #f85149; }
+
+    /* ── DQ issues table styling ── */
+    .dq-issues-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+    }
+    .dq-issues-table th {
+        background: #161b22;
+        color: #2DC653;
+        font-weight: 700;
+        padding: 10px 14px;
+        text-align: left;
+        border-bottom: 1px solid #21262d;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+    }
+    .dq-issues-table td {
+        padding: 10px 14px;
+        border-bottom: 1px solid #21262d;
+        color: #e6edf3;
+        vertical-align: middle;
+    }
+    .dq-issues-table tr:hover td { background: rgba(45,198,83,0.04); }
+    .dq-issues-table tr:last-child td { border-bottom: none; }
+
+    /* ── DQ trend indicator ── */
+    .dq-trend-good { color: #2DC653; font-weight: 700; }
+    .dq-trend-bad  { color: #f85149; font-weight: 700; }
+    .dq-trend-neutral { color: #8b949e; font-weight: 600; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -366,6 +502,66 @@ def format_df_currency(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# FEATURE 3 — DATA QUALITY HELPER
+# compute_dq_score() is a pure Python function — no AWS calls, no side-effects.
+# It derives the three quality dimensions directly from the report dict that
+# the Glue ETL already writes to S3 as quality_report_<date>.json.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def compute_dq_score(report: dict) -> dict:
+    """
+    Derive data-quality dimension scores from a single Glue quality report.
+
+    Dimensions
+    ----------
+    completeness  : % rows that survived (had a valid customer_id)
+    validity      : % rows without negative amounts
+    uniqueness    : % rows without duplicate order_ids
+    overall_score : weighted mean (equal weight across the three dimensions)
+
+    Returns a dict with all raw counts plus computed percentages.
+    """
+    input_rows   = max(report.get("input_rows",  1), 1)   # guard /0
+    output_rows  = report.get("output_rows",          0)
+    null_ids     = report.get("null_customer_ids",    0)
+    neg_amounts  = report.get("negative_amounts",     0)
+    dup_ids      = report.get("duplicate_order_ids",  0)
+    rows_dropped = report.get("rows_dropped",         0)
+
+    completeness_pct = round(max(output_rows / input_rows * 100, 0), 1)
+    validity_pct     = round(max((1 - neg_amounts  / input_rows) * 100, 0), 1)
+    uniqueness_pct   = round(max((1 - dup_ids      / input_rows) * 100, 0), 1)
+    null_rate_pct    = round(null_ids / input_rows * 100, 2)
+
+    overall_score = round(
+        (completeness_pct + validity_pct + uniqueness_pct) / 3, 1
+    )
+
+    if overall_score >= 90:
+        grade = "HEALTHY"
+    elif overall_score >= 70:
+        grade = "WARNING"
+    else:
+        grade = "CRITICAL"
+
+    return {
+        "date"             : report.get("date", "—"),
+        "input_rows"       : input_rows,
+        "output_rows"      : output_rows,
+        "rows_dropped"     : rows_dropped,
+        "null_ids"         : null_ids,
+        "neg_amounts"      : neg_amounts,
+        "dup_ids"          : dup_ids,
+        "null_rate_pct"    : null_rate_pct,
+        "completeness_pct" : completeness_pct,
+        "validity_pct"     : validity_pct,
+        "uniqueness_pct"   : uniqueness_pct,
+        "overall_score"    : overall_score,
+        "grade"            : grade,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # FEATURE 1 — EMAIL ALERTING VIA AWS SNS
 # Architecture is modular: send_alert() is the single dispatch point.
 # To add Slack later, insert a Slack webhook call inside send_alert() alongside
@@ -486,8 +682,9 @@ st.markdown(
 # ══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["🔧 Setup Pipeline", "📦 Daily Load", "🔍 Ask Your Data", "📊 Pipeline Health"]
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["🔧 Setup Pipeline", "📦 Daily Load", "🔍 Ask Your Data",
+     "📊 Pipeline Health", "🛡️ Data Quality"]
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1169,6 +1366,315 @@ with tab4:
             '</div>',
             unsafe_allow_html=True,
         )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 5 — Data Quality Dashboard  (Feature 3)
+# Reads quality_report_<date>.json for all loaded days from S3, computes
+# multi-dimension DQ scores, and renders charts + an AI narrative.
+# All existing tabs and helpers are completely untouched.
+# ─────────────────────────────────────────────────────────────────────────────
+with tab5:
+    st.markdown('<div class="section-header">🛡️ Data Quality Dashboard</div>',
+                unsafe_allow_html=True)
+    st.markdown(
+        "Multi-day data quality analysis across all ETL runs — "
+        "Completeness · Validity · Uniqueness."
+    )
+
+    if st.button("🔍 Scan Quality Reports", key="btn_dq_scan"):
+
+        # ── Load all day reports from S3 ──────────────────────────────────
+        dq_records = []
+        load_errors = []
+
+        with st.spinner("📥 Reading quality reports from S3…"):
+            for _, date_str, _ in DAYS:
+                report_key = f"reports/quality_report_{date_str}.json"
+                try:
+                    obj    = s3.get_object(Bucket=BUCKET, Key=report_key)
+                    report = json.loads(obj["Body"].read().decode("utf-8"))
+                    dq_records.append(compute_dq_score(report))
+                except s3.exceptions.NoSuchKey:
+                    load_errors.append(f"`{date_str}` — report not found (ETL not run yet)")
+                except Exception as dq_err:
+                    load_errors.append(f"`{date_str}` — {str(dq_err)[:80]}")
+
+        if load_errors:
+            for msg in load_errors:
+                st.warning(f"⚠️ {msg}")
+
+        if not dq_records:
+            st.error(
+                "❌ No quality reports found. "
+                "Run the ETL for at least one day in the **Daily Load** tab first."
+            )
+            st.stop()
+
+        # ── Build a DataFrame for charts / table ──────────────────────────
+        df_dq = pd.DataFrame(dq_records)
+
+        # ── Section B: Overall DQ Score ring ─────────────────────────────
+        avg_score       = round(df_dq["overall_score"].mean(), 1)
+        avg_complete    = round(df_dq["completeness_pct"].mean(), 1)
+        avg_validity    = round(df_dq["validity_pct"].mean(), 1)
+        avg_uniqueness  = round(df_dq["uniqueness_pct"].mean(), 1)
+
+        if avg_score >= 90:
+            ring_color  = "#2DC653"
+            grade_label = "HEALTHY"
+            badge_cls   = "dq-badge-healthy"
+        elif avg_score >= 70:
+            ring_color  = "#ffc400"
+            grade_label = "WARNING"
+            badge_cls   = "dq-badge-warning"
+        else:
+            ring_color  = "#f85149"
+            grade_label = "CRITICAL"
+            badge_cls   = "dq-badge-critical"
+
+        # SVG ring maths: r=62, circumference = 2*pi*62 ≈ 389.6
+        CIRC      = 389.6
+        dashoffset = round(CIRC * (1 - avg_score / 100), 2)
+
+        st.markdown(
+            '<div class="section-header" style="font-size:1.1rem">'
+            '📊 Overall Data Quality Score</div>',
+            unsafe_allow_html=True,
+        )
+
+        score_col, dim_col = st.columns([1, 2])
+
+        with score_col:
+            st.markdown(
+                f"""
+                <div class="dq-score-wrapper">
+                  <div class="dq-score-ring">
+                    <svg viewBox="0 0 160 160" width="160" height="160">
+                      <circle class="ring-bg" cx="80" cy="80" r="62"/>
+                      <circle class="ring-fg"
+                        cx="80" cy="80" r="62"
+                        stroke="{ring_color}"
+                        stroke-dasharray="{CIRC}"
+                        stroke-dashoffset="{dashoffset}"
+                      />
+                    </svg>
+                    <div class="dq-score-value">
+                      {avg_score}<span style="font-size:1rem;color:#8b949e">%</span>
+                    </div>
+                  </div>
+                  <div class="dq-score-label">Overall DQ Score</div>
+                  <div class="dq-score-title" style="color:{ring_color}">
+                    <span class="dq-badge {badge_cls}">{grade_label}</span>
+                  </div>
+                  <div style="color:#8b949e;font-size:0.78rem;margin-top:8px">
+                    {len(dq_records)} day(s) analysed
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        # ── Section C: Dimension cards ────────────────────────────────────
+        with dim_col:
+            st.markdown(
+                '<div class="section-header" style="font-size:1rem;margin-top:8px">'
+                '🔬 Quality Dimensions</div>',
+                unsafe_allow_html=True,
+            )
+            d1, d2, d3 = st.columns(3)
+
+            def _dim_color(pct: float) -> str:
+                if pct >= 95:  return "#2DC653"
+                if pct >= 80:  return "#ffc400"
+                return "#f85149"
+
+            with d1:
+                col = _dim_color(avg_complete)
+                st.markdown(
+                    f'<div class="dq-dim-card">'
+                    f'<div class="dq-dim-icon">📋</div>'
+                    f'<div class="dq-dim-name">Completeness</div>'
+                    f'<div class="dq-dim-value" style="color:{col}">{avg_complete}%</div>'
+                    f'<div class="dq-dim-desc">Valid rows retained after null-ID removal</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            with d2:
+                col = _dim_color(avg_validity)
+                st.markdown(
+                    f'<div class="dq-dim-card">'
+                    f'<div class="dq-dim-icon">✅</div>'
+                    f'<div class="dq-dim-name">Validity</div>'
+                    f'<div class="dq-dim-value" style="color:{col}">{avg_validity}%</div>'
+                    f'<div class="dq-dim-desc">Rows without negative order amounts</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            with d3:
+                col = _dim_color(avg_uniqueness)
+                st.markdown(
+                    f'<div class="dq-dim-card">'
+                    f'<div class="dq-dim-icon">🔁</div>'
+                    f'<div class="dq-dim-name">Uniqueness</div>'
+                    f'<div class="dq-dim-value" style="color:{col}">{avg_uniqueness}%</div>'
+                    f'<div class="dq-dim-desc">Rows without duplicate order IDs</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+
+        # ── Section D: Multi-day trend charts ─────────────────────────────
+        st.markdown(
+            '<div class="section-header" style="font-size:1.1rem">'
+            '📈 Multi-Day Quality Trends</div>',
+            unsafe_allow_html=True,
+        )
+
+        chart_df = df_dq.set_index("date")[
+            ["overall_score", "completeness_pct", "validity_pct", "uniqueness_pct"]
+        ].rename(columns={
+            "overall_score"    : "Overall Score",
+            "completeness_pct" : "Completeness %",
+            "validity_pct"     : "Validity %",
+            "uniqueness_pct"   : "Uniqueness %",
+        })
+
+        tc1, tc2 = st.columns(2)
+
+        with tc1:
+            st.markdown(
+                '<div style="color:#2DC653;font-weight:600;font-size:0.92rem;'
+                'margin-bottom:6px">🎯 Overall DQ Score per Day (%)</div>',
+                unsafe_allow_html=True,
+            )
+            st.bar_chart(
+                chart_df[["Overall Score"]],
+                color="#2DC653",
+                use_container_width=True,
+            )
+
+        with tc2:
+            st.markdown(
+                '<div style="color:#2DC653;font-weight:600;font-size:0.92rem;'
+                'margin-bottom:6px">📉 Issues per Day (raw counts)</div>',
+                unsafe_allow_html=True,
+            )
+            issues_chart = df_dq.set_index("date")[
+                ["null_ids", "neg_amounts", "dup_ids"]
+            ].rename(columns={
+                "null_ids"    : "Null IDs",
+                "neg_amounts" : "Negative Amounts",
+                "dup_ids"     : "Duplicate IDs",
+            })
+            st.bar_chart(issues_chart, use_container_width=True)
+
+        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+
+        # ── Section E: Per-day issues table ──────────────────────────────
+        st.markdown(
+            '<div class="section-header" style="font-size:1.1rem">'
+            '📋 Day-by-Day Quality Breakdown</div>',
+            unsafe_allow_html=True,
+        )
+
+        def _badge_html(grade: str) -> str:
+            cls = {
+                "HEALTHY" : "dq-badge-healthy",
+                "WARNING" : "dq-badge-warning",
+                "CRITICAL": "dq-badge-critical",
+            }.get(grade, "dq-badge-warning")
+            icon = {"HEALTHY": "✅", "WARNING": "⚠️", "CRITICAL": "🚨"}.get(grade, "⚠️")
+            return f'<span class="dq-badge {cls}">{icon} {grade}</span>'
+
+        rows_html = ""
+        for rec in dq_records:
+            rows_html += (
+                f"<tr>"
+                f"<td><strong>{rec['date']}</strong></td>"
+                f"<td>{rec['input_rows']:,}</td>"
+                f"<td>{rec['output_rows']:,}</td>"
+                f"<td style='color:#f85149'>{rec['null_ids']}</td>"
+                f"<td style='color:#ffc400'>{rec['neg_amounts']}</td>"
+                f"<td style='color:#ffc400'>{rec['dup_ids']}</td>"
+                f"<td>{rec['rows_dropped']:,}</td>"
+                f"<td><strong style='color:#e6edf3'>{rec['overall_score']}%</strong></td>"
+                f"<td>{_badge_html(rec['grade'])}</td>"
+                f"</tr>"
+            )
+
+        table_html = f"""
+        <table class="dq-issues-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Input Rows</th>
+              <th>Output Rows</th>
+              <th>🚫 Null IDs</th>
+              <th>⚠️ Neg. Amounts</th>
+              <th>🔁 Duplicates</th>
+              <th>Rows Dropped</th>
+              <th>DQ Score</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows_html}
+          </tbody>
+        </table>
+        """
+        st.markdown(table_html, unsafe_allow_html=True)
+
+        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+
+        # ── Section F: Bedrock AI narrative ──────────────────────────────
+        with st.spinner("🤖 Generating Data Quality narrative with AI…"):
+            try:
+                dq_summary_rows = [
+                    f"  Date={r['date']}: score={r['overall_score']}%, "
+                    f"completeness={r['completeness_pct']}%, "
+                    f"validity={r['validity_pct']}%, "
+                    f"uniqueness={r['uniqueness_pct']}%, "
+                    f"nulls={r['null_ids']}, negatives={r['neg_amounts']}, "
+                    f"duplicates={r['dup_ids']}, dropped={r['rows_dropped']}"
+                    for r in dq_records
+                ]
+                dq_prompt = (
+                    f"You are a senior data quality engineer reviewing a logistics pipeline.\n"
+                    f"Multi-day quality summary ({len(dq_records)} day(s)):\n"
+                    + "\n".join(dq_summary_rows)
+                    + "\n\nRespond with exactly 3 concise sentences:\n"
+                    f"Sentence 1: Overall data quality health status and trend.\n"
+                    f"Sentence 2: The most critical issue dimension and which day it peaked.\n"
+                    f"Sentence 3: One actionable remediation recommendation for the data team.\n"
+                    f"Use plain English. No markdown formatting."
+                )
+                dq_ai_text = bedrock_converse(dq_prompt)
+
+                st.markdown(
+                    f'<div class="ai-insight">'
+                    f'<div class="ai-label">🤖 AI Data Quality Analysis — Nova Lite</div>'
+                    f'<div class="ai-text">{dq_ai_text}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            except Exception as ai_err:
+                st.warning(f"Could not generate AI narrative: {ai_err}")
+
+    else:
+        # ── Placeholder when button not yet clicked ───────────────────────
+        st.markdown(
+            '<div style="text-align:center;padding:60px 20px;color:#30363d">'
+            '<div style="font-size:4rem">🛡️</div>'
+            '<div style="font-size:1.1rem;margin-top:12px">Click '
+            '<strong style="color:#2DC653">🔍 Scan Quality Reports</strong> '
+            'to analyse data quality across all loaded days</div>'
+            '<div style="font-size:0.85rem;margin-top:8px;color:#21262d">'
+            'Requires at least one completed ETL run in the Daily Load tab</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
 
 # ── Footer ─────────────────────────────────────────────────────────────────────
 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)

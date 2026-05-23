@@ -38,7 +38,7 @@ Amazon Athena  ──► SQL Query Engine on processed S3 data
 Amazon Bedrock (Nova Lite)  ──► NL→SQL · Quality Analysis · Executive Summary
     │
     ▼
-Streamlit Dashboard  ──► 4-tab browser UI
+Streamlit Dashboard  ──► 5-tab browser UI
     │
     ▼
 AWS SNS  ──► Email Alerts (on ETL failure or DQ threshold breach)
@@ -224,6 +224,36 @@ Full pipeline health overview on demand:
 
 ---
 
+### Tab 5 — 🛡️ Data Quality
+
+Multi-day data quality analysis powered by the Glue-generated quality reports (Feature 3):
+
+- Click **🔍 Scan Quality Reports** to load all available day reports from S3 in one shot
+- **Overall DQ Score ring** — animated SVG ring showing a weighted 0–100 score across all loaded days, colour-coded:
+  - 🟢 **≥ 90%** — HEALTHY
+  - 🟡 **70–89%** — WARNING
+  - 🔴 **< 70%** — CRITICAL
+- **3 Quality Dimension cards** (colour-coded green / amber / red per threshold):
+
+  | Dimension | Formula | What it measures |
+  |-----------|---------|------------------|
+  | **Completeness** | `output_rows / input_rows × 100` | Valid rows retained after null customer_id removal |
+  | **Validity** | `(1 − negative_amounts / input_rows) × 100` | Rows with legal (non-negative) order amounts |
+  | **Uniqueness** | `(1 − duplicate_order_ids / input_rows) × 100` | Rows without duplicate order IDs |
+
+- **Multi-Day Trend Charts**:
+  - Bar chart — Overall DQ Score per day (%)
+  - Stacked bar chart — Raw issue counts per day (Null IDs · Negative Amounts · Duplicate IDs)
+- **Day-by-Day Quality Breakdown** — custom styled HTML table with columns:
+  `Date · Input Rows · Output Rows · 🚫 Null IDs · ⚠️ Neg. Amounts · 🔁 Duplicates · Rows Dropped · DQ Score · Status badge`
+- **Bedrock AI narrative** — 3-sentence data steward summary covering:
+  1. Overall quality health status and trend
+  2. Most critical dimension and the day it peaked
+  3. One actionable remediation recommendation
+- Graceful per-day error handling — missing reports show a warning; the tab still renders all successfully loaded days
+
+---
+
 ## 🔔 Email Alerting — AWS SNS (Feature 1)
 
 ### When emails are sent
@@ -334,6 +364,11 @@ streamlit run app.py
 - Open **Tab 2 — 📦 Daily Load**
 - Select a day from the dropdown
 - Click **▶️ Run ETL**
+
+### 7. View data quality
+- Open **Tab 5 — 🛡️ Data Quality** after running at least one ETL day
+- Click **🔍 Scan Quality Reports**
+- Review the DQ Score ring, dimension cards, trend charts, and AI narrative
 
 ---
 
